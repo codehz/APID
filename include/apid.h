@@ -28,7 +28,7 @@ int apid_set_prop(apid_zero_callback callback, void *privdata, char const *name,
 int apid_get_prop(apid_data_callback callback, void *privdata, char const *name);
 
 int apid_publish(char const *name, char const *data);
-int apid_subscribe(apid_data_callback callback, void *privdata, char const *name, char const *data);
+int apid_subscribe(apid_data_callback callback, void *privdata, char const *name);
 int apid_subscribe_pattern(apid_data2_callback callback, void *privdata, char const *pattern, char const *data);
 
 #ifdef __cplusplus

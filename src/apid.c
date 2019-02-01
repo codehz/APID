@@ -273,7 +273,7 @@ static void apid_subscibe_stub(redisAsyncContext *c, void *r, void *privdata) {
   callback(reply->str, userdata);
 }
 
-int apid_subscribe(apid_data_callback callback, void *privdata, char const *name, char const *data) {
+int apid_subscribe(apid_data_callback callback, void *privdata, char const *name) {
   assert(callback);
   return redisAsyncCommand(sub_ctx, apid_subscibe_stub, make_bundle((void *)callback, privdata), "SUBSCRIBE %s", name);
 }
