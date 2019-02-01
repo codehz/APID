@@ -27,8 +27,8 @@ int apid_method_reply(apid_method_reply_ctx *, char const *content);
 int apid_invoke(apid_zero_callback callback, void *privdata, char const *name, char const *argument);
 int apid_invoke_method(apid_data_callback callback, void *privdata, char const *name, char const *argument);
 
-int apid_set_prop(apid_zero_callback callback, void *privdata, char const *name, char const *value);
-int apid_get_prop(apid_data_callback callback, void *privdata, char const *name);
+int apid_kv_set(apid_zero_callback callback, void *privdata, char const *name, char const *value);
+int apid_kv_get(apid_data_callback callback, void *privdata, char const *name);
 
 int apid_publish(char const *name, char const *data);
 int apid_subscribe(apid_data_callback callback, void *privdata, char const *name);

@@ -233,7 +233,7 @@ int apid_invoke_method(apid_data_callback callback, void *privdata, char const *
   return ret;
 }
 
-int apid_set_prop(apid_zero_callback callback, void *privdata, char const *name, char const *value) {
+int apid_kv_set(apid_zero_callback callback, void *privdata, char const *name, char const *value) {
   if (callback) { return redisAsyncCommand(ctx, apid_zero_stub, make_bundle((void *)callback, privdata), "SET %s %s", name, value); }
   return redisAsyncCommand(ctx, check_error, (void *)"apid_set_prop", "SET %s %s", name, value);
 }
@@ -253,7 +253,7 @@ static void apid_data_stub(redisAsyncContext *c, void *r, void *privdata) {
   callback(reply->str, userdata);
 }
 
-int apid_get_prop(apid_data_callback callback, void *privdata, char const *name) {
+int apid_kv_get(apid_data_callback callback, void *privdata, char const *name) {
   if (callback) { return redisAsyncCommand(ctx, apid_data_stub, make_bundle((void *)callback, privdata), "GET %s", name); }
   return redisAsyncCommand(ctx, check_error, (void *)"apid_get_prop", "GET %s", name);
 }
