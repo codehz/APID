@@ -12,6 +12,9 @@ int main() {
   assert(apid_init() == 0);
   apid_register_action("test1", test1, NULL);
   apid_register_method("test2", test2, NULL);
+  apid_set_clear(NULL, NULL, "test3");
+  apid_set_add(NULL, NULL, "test3", "a b");
+  apid_set_add(NULL, NULL, "test3", "c");
   apid_kv_set(NULL, NULL, "note", "it is the note!");
   apid_start();
 }

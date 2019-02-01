@@ -10,6 +10,8 @@
 #include <string.h>
 #include <uuid/uuid.h>
 
+#define OPTIONAL_CALLBACK(name, func) (callback ? name : check_error), (callback ? make_bundle((void *)callback, privdata) : (void *)func)
+
 static aeEventLoop *loop          = NULL;
 static redisAsyncContext *sub_ctx = NULL;
 static redisAsyncContext *ctx     = NULL;
@@ -142,7 +144,6 @@ static void action_callback_stub(redisAsyncContext *c, void *r, void *privdata) 
   }
   if (!reply || reply->type != REDIS_REPLY_ARRAY || strcmp(reply->element[0]->str, "message") != 0) return;
   callback(reply->element[2]->str, userdata);
-  free_bundle(priv);
 }
 
 int apid_register_action(char const *name, apid_action_callback callback, void *privdata) {
@@ -170,7 +171,6 @@ static void method_callback_stub(redisAsyncContext *c, void *r, void *privdata) 
   reply_ctx->privdata              = userdata;
   memcpy(&reply_ctx->buffer, full, len);
   callback(reply->element[3]->str, reply_ctx);
-  free_bundle(priv);
 }
 
 int apid_register_method(char const *name, apid_method_callback callback, void *privdata) {
@@ -197,8 +197,7 @@ static void apid_zero_stub(redisAsyncContext *c, void *r, void *privdata) {
 }
 
 int apid_invoke(apid_zero_callback callback, void *privdata, char const *name, char const *argument) {
-  if (callback) { return redisAsyncCommand(ctx, apid_zero_stub, make_bundle((void *)callback, privdata), "PUBLISH %s %s", name, argument); }
-  return redisAsyncCommand(ctx, check_error, (void *)"apid_invoke", "PUBLISH %s %s", name, argument);
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_invoke"), "PUBLISH %s %s", name, argument);
 }
 
 static void apid_invoke_method_stub(redisAsyncContext *c, void *r, void *privdata) {
@@ -234,8 +233,7 @@ int apid_invoke_method(apid_data_callback callback, void *privdata, char const *
 }
 
 int apid_kv_set(apid_zero_callback callback, void *privdata, char const *name, char const *value) {
-  if (callback) { return redisAsyncCommand(ctx, apid_zero_stub, make_bundle((void *)callback, privdata), "SET %s %s", name, value); }
-  return redisAsyncCommand(ctx, check_error, (void *)"apid_set_prop", "SET %s %s", name, value);
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_kv_set"), "SET %s %s", name, value);
 }
 
 static void apid_data_stub(redisAsyncContext *c, void *r, void *privdata) {
@@ -254,8 +252,7 @@ static void apid_data_stub(redisAsyncContext *c, void *r, void *privdata) {
 }
 
 int apid_kv_get(apid_data_callback callback, void *privdata, char const *name) {
-  if (callback) { return redisAsyncCommand(ctx, apid_data_stub, make_bundle((void *)callback, privdata), "GET %s", name); }
-  return redisAsyncCommand(ctx, check_error, (void *)"apid_get_prop", "GET %s", name);
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_data_stub, "apid_kv_get"), "GET %s", name);
 }
 
 int apid_publish(char const *name, char const *data) {
@@ -296,4 +293,55 @@ static void apid_subscibe_pattern_stub(redisAsyncContext *c, void *r, void *priv
 int apid_subscribe_pattern(apid_data2_callback callback, void *privdata, char const *pattern) {
   assert(callback);
   return redisAsyncCommand(sub_ctx, apid_subscibe_pattern_stub, make_bundle((void *)callback, privdata), "PSUBSCRIBE %s", pattern);
+}
+
+int apid_set_clear(apid_zero_callback callback, void *privdata, char const *key) {
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_set_clear"), "DEL %s", key);
+}
+
+int apid_set_add(apid_zero_callback callback, void *privdata, char const *key, char const *value) {
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_set_add"), "SADD %s %s", key, value);
+}
+
+int apid_set_remove(apid_zero_callback callback, void *privdata, char const *key, char const *value) {
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_set_remove"), "SREM %s %s", key, value);
+}
+
+static void apid_set_iterate_stub(redisAsyncContext *c, void *r, void *privdata) {
+  callback_bundle *priv = (callback_bundle *)privdata;
+  redisReply *reply     = (redisReply *)r;
+  if (c->err) {
+    printf("apid_set_iterate: %s\n", c->errstr);
+    exit(1);
+  }
+  if (!reply || reply->type != REDIS_REPLY_ARRAY) return;
+  apid_data_done_callback callback = (apid_data_done_callback)priv->callback;
+  void *userdata                   = priv->privdata;
+  free_bundle(priv);
+  for (int i = 0; i < reply->elements; i++) callback(false, reply->element[i]->str, userdata);
+  callback(true, NULL, userdata);
+}
+
+int apid_set_iterate(apid_data_done_callback callback, void *privdata, char const *key) {
+  assert(callback);
+  return redisAsyncCommand(ctx, apid_set_iterate_stub, make_bundle((void *)callback, privdata), "SMEMBERS %s", key);
+}
+
+static void apid_set_contains_stub(redisAsyncContext *c, void *r, void *privdata) {
+  callback_bundle *priv = (callback_bundle *)privdata;
+  redisReply *reply     = (redisReply *)r;
+  if (c->err) {
+    printf("apid_set_iterate: %s\n", c->errstr);
+    exit(1);
+  }
+  if (!reply || reply->type != REDIS_REPLY_INTEGER) return;
+  apid_bool_callback callback = (apid_bool_callback)priv->callback;
+  void *userdata              = priv->privdata;
+  free_bundle(priv);
+  callback(!!reply->integer, userdata);
+}
+
+int apid_set_contains(apid_bool_callback callback, void *privdata, char const *key, char const *value) {
+  assert(callback);
+  return redisAsyncCommand(ctx, apid_set_contains_stub, make_bundle((void *)callback, privdata), "SISMEMBER %s %s", key, value);
 }
