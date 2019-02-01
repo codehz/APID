@@ -11,6 +11,7 @@ add_library(ae ae/ae.c ae/zmalloc.c)
 add_library(hiredis hiredis/hiredis.c hiredis/async.c hiredis/sds.c hiredis/net.c hiredis/read.c)
 
 add_library(apid src/apid.c)
+target_include_directories(apid INTERFACE "include")
 target_include_directories(apid PRIVATE ae hiredis)
 target_link_libraries(apid hiredis ae)
 
