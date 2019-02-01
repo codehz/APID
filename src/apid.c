@@ -292,7 +292,7 @@ static void apid_subscibe_pattern_stub(redisAsyncContext *c, void *r, void *priv
   callback(reply->element[2]->str, reply->element[3]->str, userdata);
 }
 
-int apid_subscribe_pattern(apid_data2_callback callback, void *privdata, char const *pattern, char const *data) {
+int apid_subscribe_pattern(apid_data2_callback callback, void *privdata, char const *pattern) {
   assert(callback);
   return redisAsyncCommand(sub_ctx, apid_subscibe_stub, make_bundle((void *)callback, privdata), "PSUBSCRIBE %s", pattern);
 }
