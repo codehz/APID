@@ -7,13 +7,14 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include_directories(include)
 
 add_library(ae ae/ae.c ae/zmalloc.c)
+target_include_directories(ae INTERFACE ae)
 
 add_library(hiredis hiredis/hiredis.c hiredis/async.c hiredis/sds.c hiredis/net.c hiredis/read.c)
+target_include_directories(hiredis INTERFACE hiredis)
 
 add_library(apid src/apid.c)
-target_include_directories(apid INTERFACE "include")
-target_include_directories(apid PRIVATE ae hiredis)
-target_link_libraries(apid hiredis ae)
+target_include_directories(apid INTERFACE include)
+target_link_libraries(apid PRIVATE hiredis ae)
 
 add_executable(apid-test tests/test.c)
 target_link_libraries(apid-test apid)
