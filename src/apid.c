@@ -128,6 +128,9 @@ int apid_stop() {
   return 0;
 }
 
+char const *apid_underlying_impl() { return "redis"; }
+void *apid_underlying_context() { return (void *)ctx; }
+
 static void action_callback_stub(redisAsyncContext *c, void *r, void *privdata) {
   callback_bundle *priv         = (callback_bundle *)privdata;
   apid_action_callback callback = (apid_action_callback)priv->callback;

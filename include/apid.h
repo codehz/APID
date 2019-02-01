@@ -17,6 +17,9 @@ int apid_init_tcp(char const *ip, int port);
 int apid_start();
 int apid_stop();
 
+char const *apid_underlying_impl();
+void *apid_underlying_context();
+
 int apid_register_action(char const *name, apid_action_callback callback, void *privdata);
 int apid_register_method(char const *name, apid_method_callback callback, void *privdata);
 int apid_method_reply(apid_method_reply_ctx *, char const *content);
