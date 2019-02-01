@@ -269,7 +269,6 @@ static void apid_subscibe_stub(redisAsyncContext *c, void *r, void *privdata) {
   if (!reply || reply->type != REDIS_REPLY_ARRAY || strcmp(reply->element[0]->str, "message") != 0) return;
   apid_data_callback callback = (apid_data_callback)priv->callback;
   void *userdata              = priv->privdata;
-  free_bundle(priv);
   callback(reply->str, userdata);
 }
 
@@ -288,11 +287,10 @@ static void apid_subscibe_pattern_stub(redisAsyncContext *c, void *r, void *priv
   if (!reply || reply->type != REDIS_REPLY_ARRAY || strcmp(reply->element[0]->str, "psubscribe") == 0) return;
   apid_data2_callback callback = (apid_data2_callback)priv->callback;
   void *userdata               = priv->privdata;
-  free_bundle(priv);
   callback(reply->element[2]->str, reply->element[3]->str, userdata);
 }
 
 int apid_subscribe_pattern(apid_data2_callback callback, void *privdata, char const *pattern) {
   assert(callback);
-  return redisAsyncCommand(sub_ctx, apid_subscibe_stub, make_bundle((void *)callback, privdata), "PSUBSCRIBE %s", pattern);
+  return redisAsyncCommand(sub_ctx, apid_subscibe_pattern_stub, make_bundle((void *)callback, privdata), "PSUBSCRIBE %s", pattern);
 }
