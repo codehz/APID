@@ -8,7 +8,7 @@ typedef struct apid_method_reply_ctx apid_method_reply_ctx;
 typedef void (*apid_zero_callback)(void *privdata);
 typedef void (*apid_data_callback)(char const *data, void *privdata);
 typedef void (*apid_data2_callback)(char const *identify, char const *data, void *privdata);
-typedef void (*apid_action_callback)(char const *);
+typedef void (*apid_action_callback)(char const *, void *privdata);
 typedef void (*apid_method_callback)(char const *, apid_method_reply_ctx *);
 
 int apid_init();
@@ -17,8 +17,8 @@ int apid_init_tcp(char const *ip, int port);
 int apid_start();
 int apid_stop();
 
-int apid_register_action(char const *name, apid_action_callback callback);
-int apid_register_method(char const *name, apid_method_callback callback);
+int apid_register_action(char const *name, apid_action_callback callback, void *privdata);
+int apid_register_method(char const *name, apid_method_callback callback, void *privdata);
 int apid_method_reply(apid_method_reply_ctx *, char const *content);
 
 int apid_invoke(apid_zero_callback callback, void *privdata, char const *name, char const *argument);

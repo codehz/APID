@@ -14,6 +14,20 @@ static aeEventLoop *loop          = NULL;
 static redisAsyncContext *sub_ctx = NULL;
 static redisAsyncContext *ctx     = NULL;
 
+typedef struct callback_bundle {
+  void *callback;
+  void *privdata;
+} callback_bundle;
+
+static callback_bundle *make_bundle(void *callback, void *privdata) {
+  callback_bundle *priv = malloc(sizeof(callback_bundle));
+  priv->callback        = callback;
+  priv->privdata        = privdata;
+  return priv;
+}
+
+static void free_bundle(callback_bundle *bundle) { free(bundle); }
+
 static void rand_str(char *dest, size_t length) {
   char charset[] =
       "0123456789"
@@ -115,26 +129,32 @@ int apid_stop() {
 }
 
 static void action_callback_stub(redisAsyncContext *c, void *r, void *privdata) {
-  apid_action_callback callback = privdata;
+  callback_bundle *priv         = privdata;
+  apid_action_callback callback = priv->callback;
+  void *userdata                = priv->privdata;
   redisReply *reply             = r;
   if (c->err) {
     printf("apid_register_action: %s\n", c->errstr);
     exit(1);
   }
   if (!reply || reply->type != REDIS_REPLY_ARRAY || strcmp(reply->element[0]->str, "message") != 0) return;
-  callback(reply->element[2]->str);
+  callback(reply->element[2]->str, userdata);
+  free_bundle(priv);
 }
 
-int apid_register_action(char const *name, apid_action_callback callback) {
-  return redisAsyncCommand(sub_ctx, action_callback_stub, callback, "SUBSCRIBE %s", name);
+int apid_register_action(char const *name, apid_action_callback callback, void *privdata) {
+  return redisAsyncCommand(sub_ctx, action_callback_stub, make_bundle(callback, privdata), "SUBSCRIBE %s", name);
 }
 
 struct apid_method_reply_ctx {
+  void *privdata;
   char buffer[0];
 };
 
 static void method_callback_stub(redisAsyncContext *c, void *r, void *privdata) {
-  apid_method_callback callback = privdata;
+  callback_bundle *priv         = privdata;
+  apid_method_callback callback = priv->callback;
+  void *userdata                = priv->privdata;
   redisReply *reply             = r;
   if (c->err) {
     printf("apid_register_method: %s\n", c->errstr);
@@ -143,13 +163,15 @@ static void method_callback_stub(redisAsyncContext *c, void *r, void *privdata) 
   if (!reply || reply->type != REDIS_REPLY_ARRAY || strcmp(reply->element[0]->str, "psubscribe") == 0) return;
   char *full                       = reply->element[2]->str;
   int len                          = strlen(full);
-  apid_method_reply_ctx *reply_ctx = malloc(len);
-  memcpy(reply_ctx, full, len);
+  apid_method_reply_ctx *reply_ctx = malloc(sizeof(void *) + len);
+  reply_ctx->privdata              = userdata;
+  memcpy(&reply_ctx->buffer, full, len);
   callback(reply->element[3]->str, reply_ctx);
+  free_bundle(priv);
 }
 
-int apid_register_method(char const *name, apid_method_callback callback) {
-  return redisAsyncCommand(sub_ctx, method_callback_stub, callback, "PSUBSCRIBE %s@*", name);
+int apid_register_method(char const *name, apid_method_callback callback, void *privdata) {
+  return redisAsyncCommand(sub_ctx, method_callback_stub, make_bundle(callback, privdata), "PSUBSCRIBE %s@*", name);
 }
 
 int apid_method_reply(apid_method_reply_ctx *reply, char const *content) {
@@ -157,11 +179,6 @@ int apid_method_reply(apid_method_reply_ctx *reply, char const *content) {
   free(reply);
   return ret;
 }
-
-typedef struct callback_bundle {
-  void *callback;
-  void *privdata;
-} callback_bundle;
 
 static void apid_zero_stub(redisAsyncContext *c, void *r, void *privdata) {
   callback_bundle *priv       = privdata;
@@ -172,17 +189,12 @@ static void apid_zero_stub(redisAsyncContext *c, void *r, void *privdata) {
     printf("apid_zero_stub: %s\n", c->errstr);
     exit(1);
   }
-  free(priv);
+  free_bundle(priv);
   callback(userdata);
 }
 
 int apid_invoke(apid_zero_callback callback, void *privdata, char const *name, char const *argument) {
-  if (callback) {
-    callback_bundle *priv = malloc(sizeof(callback_bundle));
-    priv->callback        = callback;
-    priv->privdata        = privdata;
-    return redisAsyncCommand(ctx, apid_zero_stub, priv, "PUBLISH %s %s", name, argument);
-  }
+  if (callback) { return redisAsyncCommand(ctx, apid_zero_stub, make_bundle(callback, privdata), "PUBLISH %s %s", name, argument); }
   return redisAsyncCommand(ctx, check_error, "apid_invoke", "PUBLISH %s %s", name, argument);
 }
 
@@ -201,19 +213,16 @@ static void apid_invoke_method_stub(redisAsyncContext *c, void *r, void *privdat
   if (reply->type != REDIS_REPLY_ARRAY) return;
   apid_data_callback callback = priv->callback;
   void *userdata              = priv->privdata;
-  free(priv);
+  free_bundle(priv);
   callback(reply->element[1]->str, userdata);
 }
 
 int apid_invoke_method(apid_data_callback callback, void *privdata, char const *name, char const *argument) {
   if (callback) {
-    callback_bundle *priv = malloc(sizeof(callback_bundle));
-    priv->callback        = callback;
-    priv->privdata        = privdata;
     char unq[0x10];
     rand_str(unq, 0x10);
     int ret = redisAsyncCommand(ctx, check_error, "apid_invoke_method", "PUBLISH %s@%s %s", name, unq, argument);
-    ret |= redisAsyncCommand(ctx, apid_invoke_method_stub, priv, "BRPOP %s@%s 0", name, unq);
+    ret |= redisAsyncCommand(ctx, apid_invoke_method_stub, make_bundle(callback, privdata), "BRPOP %s@%s 0", name, unq);
     return ret;
   }
   int ret = redisAsyncCommand(ctx, check_error, "apid_invoke_method", "PUBLISH %s@%ignore %s", name, argument);
@@ -222,12 +231,7 @@ int apid_invoke_method(apid_data_callback callback, void *privdata, char const *
 }
 
 int apid_set_prop(apid_zero_callback callback, void *privdata, char const *name, char const *value) {
-  if (callback) {
-    callback_bundle *priv = malloc(sizeof(callback_bundle));
-    priv->callback        = callback;
-    priv->privdata        = privdata;
-    return redisAsyncCommand(ctx, apid_zero_stub, priv, "SET %s %s", name, value);
-  }
+  if (callback) { return redisAsyncCommand(ctx, apid_zero_stub, make_bundle(callback, privdata), "SET %s %s", name, value); }
   return redisAsyncCommand(ctx, check_error, "apid_set_prop", "SET %s %s", name, value);
 }
 
@@ -242,17 +246,12 @@ static void apid_data_stub(redisAsyncContext *c, void *r, void *privdata) {
   if (reply->type != REDIS_REPLY_STRING) return;
   apid_data_callback callback = priv->callback;
   void *userdata              = priv->privdata;
-  free(priv);
+  free_bundle(priv);
   callback(reply->str, userdata);
 }
 
 int apid_get_prop(apid_data_callback callback, void *privdata, char const *name) {
-  if (callback) {
-    callback_bundle *priv = malloc(sizeof(callback_bundle));
-    priv->callback        = callback;
-    priv->privdata        = privdata;
-    return redisAsyncCommand(ctx, apid_data_stub, priv, "GET %s", name);
-  }
+  if (callback) { return redisAsyncCommand(ctx, apid_data_stub, make_bundle(callback, privdata), "GET %s", name); }
   return redisAsyncCommand(ctx, check_error, "apid_get_prop", "GET %s", name);
 }
 
@@ -268,16 +267,13 @@ static void apid_subscibe_stub(redisAsyncContext *c, void *r, void *privdata) {
   if (!reply || reply->type != REDIS_REPLY_ARRAY || strcmp(reply->element[0]->str, "message") != 0) return;
   apid_data_callback callback = priv->callback;
   void *userdata              = priv->privdata;
-  free(priv);
+  free_bundle(priv);
   callback(reply->str, userdata);
 }
 
 int apid_subscribe(apid_data_callback callback, void *privdata, char const *name, char const *data) {
   assert(callback);
-  callback_bundle *priv = malloc(sizeof(callback_bundle));
-  priv->callback        = callback;
-  priv->privdata        = privdata;
-  return redisAsyncCommand(sub_ctx, apid_subscibe_stub, priv, "SUBSCRIBE %s", name);
+  return redisAsyncCommand(sub_ctx, apid_subscibe_stub, make_bundle(callback, privdata), "SUBSCRIBE %s", name);
 }
 
 static void apid_subscibe_pattern_stub(redisAsyncContext *c, void *r, void *privdata) {
@@ -290,14 +286,11 @@ static void apid_subscibe_pattern_stub(redisAsyncContext *c, void *r, void *priv
   if (!reply || reply->type != REDIS_REPLY_ARRAY || strcmp(reply->element[0]->str, "psubscribe") == 0) return;
   apid_data2_callback callback = priv->callback;
   void *userdata               = priv->privdata;
-  free(priv);
+  free_bundle(priv);
   callback(reply->element[2]->str, reply->element[3]->str, userdata);
 }
 
 int apid_subscribe_pattern(apid_data2_callback callback, void *privdata, char const *pattern, char const *data) {
   assert(callback);
-  callback_bundle *priv = malloc(sizeof(callback_bundle));
-  priv->callback        = callback;
-  priv->privdata        = privdata;
-  return redisAsyncCommand(sub_ctx, apid_subscibe_stub, priv, "PSUBSCRIBE %s", pattern);
+  return redisAsyncCommand(sub_ctx, apid_subscibe_stub, make_bundle(callback, privdata), "PSUBSCRIBE %s", pattern);
 }
