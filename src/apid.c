@@ -60,6 +60,20 @@ static void disconnectCallback(const redisAsyncContext *c, int status) {
   aeStop(loop);
 }
 
+static void apid_count_stub(redisAsyncContext *c, void *r, void *privdata) {
+  callback_bundle *priv = (callback_bundle *)privdata;
+  redisReply *reply     = (redisReply *)r;
+  if (c->err) {
+    printf("apid_count_stub: %s\n", c->errstr);
+    exit(1);
+  }
+  if (!reply || reply->type != REDIS_REPLY_INTEGER) return;
+  apid_number_callback callback = (apid_number_callback)priv->callback;
+  void *userdata                = priv->privdata;
+  free_bundle(priv);
+  callback(reply->integer, userdata);
+}
+
 static void check_error(redisAsyncContext *c, void *r, void *privdata) {
   if (c->err) {
     printf("%s: %s\n", privdata, c->errstr);
@@ -295,16 +309,16 @@ int apid_subscribe_pattern(apid_data2_callback callback, void *privdata, char co
   return redisAsyncCommand(sub_ctx, apid_subscibe_pattern_stub, make_bundle((void *)callback, privdata), "PSUBSCRIBE %s", pattern);
 }
 
-int apid_set_clear(apid_zero_callback callback, void *privdata, char const *key) {
-  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_set_clear"), "DEL %s", key);
+int apid_set_clear(apid_number_callback callback, void *privdata, char const *key) {
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_count_stub, "apid_set_clear"), "DEL %s", key);
 }
 
-int apid_set_add(apid_zero_callback callback, void *privdata, char const *key, char const *value) {
-  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_set_add"), "SADD %s %s", key, value);
+int apid_set_add(apid_number_callback callback, void *privdata, char const *key, char const *value) {
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_count_stub, "apid_set_add"), "SADD %s %s", key, value);
 }
 
-int apid_set_remove(apid_zero_callback callback, void *privdata, char const *key, char const *value) {
-  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_set_remove"), "SREM %s %s", key, value);
+int apid_set_remove(apid_number_callback callback, void *privdata, char const *key, char const *value) {
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_count_stub, "apid_set_remove"), "SREM %s %s", key, value);
 }
 
 static void apid_set_iterate_stub(redisAsyncContext *c, void *r, void *privdata) {
@@ -346,12 +360,12 @@ int apid_set_contains(apid_bool_callback callback, void *privdata, char const *k
   return redisAsyncCommand(ctx, apid_set_contains_stub, make_bundle((void *)callback, privdata), "SISMEMBER %s %s", key, value);
 }
 
-int apid_hash_clear(apid_zero_callback callback, void *privdata, char const *key) {
-  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_hash_clear"), "DEL %s", key);
+int apid_hash_clear(apid_number_callback callback, void *privdata, char const *key) {
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_count_stub, "apid_hash_clear"), "DEL %s", key);
 }
 
-int apid_hash_set(apid_zero_callback callback, void *privdata, char const *key, char const *hkey, char const *hvalue) {
-  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_hash_set"), "HSET %s %s %s", key, hkey, hvalue);
+int apid_hash_set(apid_number_callback callback, void *privdata, char const *key, char const *hkey, char const *hvalue) {
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_count_stub, "apid_hash_set"), "HSET %s %s %s", key, hkey, hvalue);
 }
 
 static void apid_hash_get_stub(redisAsyncContext *c, void *r, void *privdata) {
