@@ -2,3 +2,5 @@ build
 .ccls-cache
 .vscode
 .git
+Dockerfile
+.dockerignore
