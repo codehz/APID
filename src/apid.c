@@ -331,7 +331,7 @@ static void apid_set_contains_stub(redisAsyncContext *c, void *r, void *privdata
   callback_bundle *priv = (callback_bundle *)privdata;
   redisReply *reply     = (redisReply *)r;
   if (c->err) {
-    printf("apid_set_iterate: %s\n", c->errstr);
+    printf("apid_set_contains: %s\n", c->errstr);
     exit(1);
   }
   if (!reply || reply->type != REDIS_REPLY_INTEGER) return;
@@ -344,4 +344,38 @@ static void apid_set_contains_stub(redisAsyncContext *c, void *r, void *privdata
 int apid_set_contains(apid_bool_callback callback, void *privdata, char const *key, char const *value) {
   assert(callback);
   return redisAsyncCommand(ctx, apid_set_contains_stub, make_bundle((void *)callback, privdata), "SISMEMBER %s %s", key, value);
+}
+
+int apid_hash_clear(apid_zero_callback callback, void *privdata, char const *key) {
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_hash_clear"), "DEL %s", key);
+}
+
+int apid_hash_set(apid_zero_callback callback, void *privdata, char const *key, char const *hkey, char const *hvalue) {
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_hash_set"), "HSET %s %s %s", key, hkey, hvalue);
+}
+
+static void apid_hash_get_stub(redisAsyncContext *c, void *r, void *privdata) {
+  callback_bundle *priv = (callback_bundle *)privdata;
+  redisReply *reply     = (redisReply *)r;
+  if (c->err) {
+    printf("apid_hash_get: %s\n", c->errstr);
+    exit(1);
+  }
+  if (!reply) return;
+  if (reply->type == REDIS_REPLY_NIL) {
+    apid_data_flag_callback callback = (apid_data_flag_callback)priv->callback;
+    void *userdata                   = priv->privdata;
+    free_bundle(priv);
+    callback(false, NULL, userdata);
+  } else if (reply->type == REDIS_REPLY_STRING) {
+    apid_data_flag_callback callback = (apid_data_flag_callback)priv->callback;
+    void *userdata                   = priv->privdata;
+    free_bundle(priv);
+    callback(true, reply->str, userdata);
+  }
+}
+
+int apid_hash_get(apid_data_flag_callback callback, void *privdata, char const *key, char const *hkey) {
+  assert(callback);
+  return redisAsyncCommand(ctx, apid_hash_get_stub, make_bundle((void *)callback, privdata), "HGET %s %s", key, hkey);
 }

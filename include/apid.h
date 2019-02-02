@@ -10,6 +10,7 @@ typedef struct apid_method_reply_ctx apid_method_reply_ctx;
 typedef void (*apid_zero_callback)(void *privdata);
 typedef void (*apid_data_callback)(char const *data, void *privdata);
 typedef void (*apid_bool_callback)(bool value, void *privdata);
+typedef void (*apid_data_flag_callback)(bool flag, char const *data, void *privdata);
 typedef void (*apid_data_done_callback)(bool done, char const *data, void *privdata);
 typedef void (*apid_data2_callback)(char const *identify, char const *data, void *privdata);
 typedef void (*apid_action_callback)(char const *, void *privdata);
@@ -43,6 +44,10 @@ int apid_set_add(apid_zero_callback callback, void *privdata, char const *key, c
 int apid_set_remove(apid_zero_callback callback, void *privdata, char const *key, char const *value);
 int apid_set_iterate(apid_data_done_callback callback, void *privdata, char const *key) __attribute__((nonnull(1)));
 int apid_set_contains(apid_bool_callback callback, void *privdata, char const *key, char const *value) __attribute__((nonnull(1)));
+
+int apid_hash_clear(apid_zero_callback callback, void *privdata, char const *key);
+int apid_hash_set(apid_zero_callback callback, void *privdata, char const *key, char const *hkey, char const *hvalue);
+int apid_hash_get(apid_data_flag_callback callback, void *privdata, char const *key, char const *hkey) __attribute__((nonnull(1)));
 
 #ifdef __cplusplus
 }
