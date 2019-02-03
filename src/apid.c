@@ -180,10 +180,11 @@ static void method_callback_stub(redisAsyncContext *c, void *r, void *privdata) 
   }
   if (!reply || reply->type != REDIS_REPLY_ARRAY || strcmp(reply->element[0]->str, "psubscribe") == 0) return;
   char *full                       = reply->element[2]->str;
-  int len                          = strlen(full);
+  int len                          = reply->element[2]->len;
   apid_method_reply_ctx *reply_ctx = (apid_method_reply_ctx *)malloc(sizeof(void *) + len + 1);
   reply_ctx->privdata              = userdata;
   strncpy((char *)&reply_ctx->buffer, full, len);
+  reply_ctx->buffer[len] = 0;
   callback(reply->element[3]->str, reply_ctx);
 }
 
