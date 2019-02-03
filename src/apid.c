@@ -181,9 +181,9 @@ static void method_callback_stub(redisAsyncContext *c, void *r, void *privdata) 
   if (!reply || reply->type != REDIS_REPLY_ARRAY || strcmp(reply->element[0]->str, "psubscribe") == 0) return;
   char *full                       = reply->element[2]->str;
   int len                          = strlen(full);
-  apid_method_reply_ctx *reply_ctx = (apid_method_reply_ctx *)malloc(sizeof(void *) + len);
+  apid_method_reply_ctx *reply_ctx = (apid_method_reply_ctx *)malloc(sizeof(void *) + len + 1);
   reply_ctx->privdata              = userdata;
-  memcpy(&reply_ctx->buffer, full, len);
+  strncpy((char *)&reply_ctx->buffer, full, len);
   callback(reply->element[3]->str, reply_ctx);
 }
 
@@ -241,7 +241,7 @@ int apid_invoke_method(apid_data_callback callback, void *privdata, char const *
     ret |= redisAsyncCommand(ctx, apid_invoke_method_stub, make_bundle((void *)callback, privdata), "BRPOP %s@%s 0", name, unq);
     return ret;
   }
-  int ret = redisAsyncCommand(ctx, check_error, (void *)"apid_invoke_method", "PUBLISH %s@%ignore %s", name, argument);
+  int ret = redisAsyncCommand(ctx, check_error, (void *)"apid_invoke_method", "PUBLISH %s@ignore %s", name, argument);
   ret |= redisAsyncCommand(ctx, check_error, (void *)"apid_invoke_method", "BRPOP %s@ignore 0", name);
   return ret;
 }
