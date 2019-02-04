@@ -2,6 +2,10 @@
 
 #include <stdbool.h>
 
+#ifdef APID_USE_LIBUV
+#include <uv.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -20,8 +24,12 @@ typedef void (*apid_method_callback)(char const *, apid_method_reply_ctx *);
 int apid_init();
 int apid_init_unix(char const *path);
 int apid_init_tcp(char const *ip, int port);
+#ifdef APID_USE_LIBUV
+int apid_attach(uv_loop_t* loop);
+#else
 int apid_start();
 int apid_stop();
+#endif
 
 char const *apid_underlying_impl();
 void *apid_underlying_context();

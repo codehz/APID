@@ -2,7 +2,12 @@
 
 #include <malloc.h>
 
+#ifdef APID_USE_LIBUV
+#include <adapters/libuv.h>
+#else
 #include <adapters/ae.h>
+#endif
+
 #include <assert.h>
 #include <async.h>
 #include <hiredis.h>
@@ -12,7 +17,9 @@
 
 #define OPTIONAL_CALLBACK(name, func) (callback ? name : check_error), (callback ? make_bundle((void *)callback, privdata) : (void *)func)
 
+#ifndef APID_USE_LIBUV
 static aeEventLoop *loop          = NULL;
+#endif
 static redisAsyncContext *sub_ctx = NULL;
 static redisAsyncContext *ctx     = NULL;
 
@@ -46,7 +53,9 @@ static void rand_str(char *dest, size_t length) {
 static void connectCallback(const redisAsyncContext *c, int status) {
   if (status != REDIS_OK) {
     printf("Error: %s\n", c->errstr);
+#ifndef APID_USE_LIBUV
     aeStop(loop);
+#endif
     return;
   }
 }
@@ -54,10 +63,10 @@ static void connectCallback(const redisAsyncContext *c, int status) {
 static void disconnectCallback(const redisAsyncContext *c, int status) {
   if (status != REDIS_OK) {
     printf("Error: %s\n", c->errstr);
-    aeStop(loop);
-    return;
   }
+#ifndef APID_USE_LIBUV
   aeStop(loop);
+#endif
 }
 
 static void apid_count_stub(redisAsyncContext *c, void *r, void *privdata) {
@@ -94,9 +103,11 @@ static int post_init() {
   redisAsyncSetDisconnectCallback(sub_ctx, disconnectCallback);
   redisAsyncSetConnectCallback(ctx, connectCallback);
   redisAsyncSetDisconnectCallback(ctx, disconnectCallback);
+#ifndef APID_USE_LIBUV
   loop = aeCreateEventLoop(64);
   redisAeAttach(loop, sub_ctx);
   redisAeAttach(loop, ctx);
+#endif
   srand(time(0));
   return 0;
 }
@@ -128,6 +139,13 @@ int apid_init() {
   return -2;
 }
 
+#ifdef APID_USE_LIBUV
+int apid_attach(uv_loop_t* loop) {
+  int a = redisLibuvAttach(sub_ctx, loop);
+  int b = redisLibuvAttach(ctx, loop);
+  return a | b;
+}
+#else
 int apid_start() {
   if (loop)
     aeMain(loop);
@@ -143,6 +161,7 @@ int apid_stop() {
     return -1;
   return 0;
 }
+#endif
 
 char const *apid_underlying_impl() { return "redis"; }
 void *apid_underlying_context() { return (void *)ctx; }
