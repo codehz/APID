@@ -17,6 +17,7 @@ typedef void (*apid_data_callback)(char const *data, void *privdata);
 typedef void (*apid_bool_callback)(bool value, void *privdata);
 typedef void (*apid_data_flag_callback)(bool flag, char const *data, void *privdata);
 typedef void (*apid_data_done_callback)(bool done, char const *data, void *privdata);
+typedef void (*apid_data_vector_callback)(int number, char const **data, void *privdata);
 typedef void (*apid_data2_callback)(char const *identify, char const *data, void *privdata);
 typedef void (*apid_action_callback)(char const *, void *privdata);
 typedef void (*apid_method_callback)(char const *, apid_method_reply_ctx *);
@@ -52,6 +53,7 @@ int apid_set_clear(apid_number_callback callback, void *privdata, char const *ke
 int apid_set_add(apid_number_callback callback, void *privdata, char const *key, char const *value);
 int apid_set_remove(apid_number_callback callback, void *privdata, char const *key, char const *value);
 int apid_set_iterate(apid_data_done_callback callback, void *privdata, char const *key) __attribute__((nonnull(1)));
+int apid_set_all(apid_data_vector_callback callback, void *privdata, char const *key) __attribute__((nonnull(1)));
 int apid_set_contains(apid_bool_callback callback, void *privdata, char const *key, char const *value) __attribute__((nonnull(1)));
 
 int apid_hash_clear(apid_number_callback callback, void *privdata, char const *key);

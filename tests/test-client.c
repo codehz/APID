@@ -10,10 +10,15 @@ void set_detect(bool contain, void *priv) { printf("detect(%s): %d\n", priv, con
 
 void set_iter(bool stop, char const *data, void *priv) {
   if (stop) {
-    apid_stop();
     return;
   }
   printf("SET -> %s\n", data);
+}
+void set_all(int length, char const **vec, void *priv) {
+  for (int i = 0; i < length; i++) {
+    printf("S[%d] = %s\n", i, vec[i]);
+  }
+  apid_stop();
 }
 
 void hash_test(bool nonempty, char const *data, void *priv) { printf("hash: %d %s\n", nonempty, data); }
@@ -28,5 +33,6 @@ int main() {
   apid_set_remove(NULL, NULL, "test3", "a b");
   apid_hash_get(hash_test, NULL, "test-hash", "a");
   apid_set_iterate(set_iter, NULL, "test3");
+  apid_set_all(set_all, NULL, "test3");
   apid_start();
 }

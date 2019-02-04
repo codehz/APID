@@ -18,7 +18,7 @@
 #define OPTIONAL_CALLBACK(name, func) (callback ? name : check_error), (callback ? make_bundle((void *)callback, privdata) : (void *)func)
 
 #ifndef APID_USE_LIBUV
-static aeEventLoop *loop          = NULL;
+static aeEventLoop *loop = NULL;
 #endif
 static redisAsyncContext *sub_ctx = NULL;
 static redisAsyncContext *ctx     = NULL;
@@ -61,9 +61,7 @@ static void connectCallback(const redisAsyncContext *c, int status) {
 }
 
 static void disconnectCallback(const redisAsyncContext *c, int status) {
-  if (status != REDIS_OK) {
-    printf("Error: %s\n", c->errstr);
-  }
+  if (status != REDIS_OK) { printf("Error: %s\n", c->errstr); }
 #ifndef APID_USE_LIBUV
   aeStop(loop);
 #endif
@@ -140,7 +138,7 @@ int apid_init() {
 }
 
 #ifdef APID_USE_LIBUV
-int apid_attach(uv_loop_t* loop) {
+int apid_attach(uv_loop_t *loop) {
   int a = redisLibuvAttach(sub_ctx, loop);
   int b = redisLibuvAttach(ctx, loop);
   return a | b;
@@ -359,6 +357,28 @@ static void apid_set_iterate_stub(redisAsyncContext *c, void *r, void *privdata)
 int apid_set_iterate(apid_data_done_callback callback, void *privdata, char const *key) {
   assert(callback);
   return redisAsyncCommand(ctx, apid_set_iterate_stub, make_bundle((void *)callback, privdata), "SMEMBERS %s", key);
+}
+
+static void apid_set_all_stub(redisAsyncContext *c, void *r, void *privdata) {
+  callback_bundle *priv = (callback_bundle *)privdata;
+  redisReply *reply     = (redisReply *)r;
+  if (c->err) {
+    printf("apid_set_iterate: %s\n", c->errstr);
+    exit(1);
+  }
+  if (!reply || reply->type != REDIS_REPLY_ARRAY) return;
+  apid_data_vector_callback callback = (apid_data_vector_callback)priv->callback;
+  void *userdata                     = priv->privdata;
+  free_bundle(priv);
+  char const **ret = (char const **)malloc(sizeof(char const *) * reply->elements);
+  for (int i = 0; i < reply->elements; i++) ret[i] = reply->element[i]->str;
+  callback(reply->elements, ret, userdata);
+  free(ret);
+}
+
+int apid_set_all(apid_data_vector_callback callback, void *privdata, char const *key) {
+  assert(callback);
+  return redisAsyncCommand(ctx, apid_set_all_stub, make_bundle((void *)callback, privdata), "SMEMBERS %s", key);
 }
 
 static void apid_set_contains_stub(redisAsyncContext *c, void *r, void *privdata) {
