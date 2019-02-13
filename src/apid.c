@@ -210,7 +210,7 @@ int apid_register_method(char const *name, apid_method_callback callback, void *
 }
 
 int apid_method_reply(apid_method_reply_ctx *reply, char const *content) {
-  int ret = redisAsyncCommand(ctx, NULL, NULL, "LPUSH %s %s", reply->buffer, content);
+  int ret = redisAsyncCommand(ctx, NULL, NULL, "LPUSH %s %b", reply->buffer, content, strlen(content));
   free(reply);
   return ret;
 }
@@ -229,7 +229,7 @@ static void apid_zero_stub(redisAsyncContext *c, void *r, void *privdata) {
 }
 
 int apid_invoke(apid_zero_callback callback, void *privdata, char const *name, char const *argument) {
-  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_invoke"), "PUBLISH %s %s", name, argument);
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_invoke"), "PUBLISH %s %b", name, argument, strlen(argument));
 }
 
 static void apid_invoke_method_stub(redisAsyncContext *c, void *r, void *privdata) {
@@ -259,13 +259,13 @@ int apid_invoke_method(apid_data_callback callback, void *privdata, char const *
     ret |= redisAsyncCommand(ctx, apid_invoke_method_stub, make_bundle((void *)callback, privdata), "BRPOP %s@%s 0", name, unq);
     return ret;
   }
-  int ret = redisAsyncCommand(ctx, check_error, (void *)"apid_invoke_method", "PUBLISH %s@ignore %s", name, argument);
+  int ret = redisAsyncCommand(ctx, check_error, (void *)"apid_invoke_method", "PUBLISH %s@ignore %b", name, argument, strlen(argument));
   ret |= redisAsyncCommand(ctx, check_error, (void *)"apid_invoke_method", "BRPOP %s@ignore 0", name);
   return ret;
 }
 
 int apid_kv_set(apid_zero_callback callback, void *privdata, char const *name, char const *value) {
-  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_kv_set"), "SET %s %s", name, value);
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_zero_stub, "apid_kv_set"), "SET %s %b", name, value, strlen(value));
 }
 
 static void apid_data_stub(redisAsyncContext *c, void *r, void *privdata) {
@@ -288,7 +288,7 @@ int apid_kv_get(apid_data_callback callback, void *privdata, char const *name) {
 }
 
 int apid_publish(char const *name, char const *data) {
-  return redisAsyncCommand(ctx, check_error, (void *)"apid_publish", "PUBLISH %s %s", name, data);
+  return redisAsyncCommand(ctx, check_error, (void *)"apid_publish", "PUBLISH %s %b", name, data, strlen(data));
 }
 
 static void apid_subscibe_stub(redisAsyncContext *c, void *r, void *privdata) {
@@ -332,11 +332,11 @@ int apid_set_clear(apid_number_callback callback, void *privdata, char const *ke
 }
 
 int apid_set_add(apid_number_callback callback, void *privdata, char const *key, char const *value) {
-  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_count_stub, "apid_set_add"), "SADD %s %s", key, value);
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_count_stub, "apid_set_add"), "SADD %s %b", key, value, strlen(value));
 }
 
 int apid_set_remove(apid_number_callback callback, void *privdata, char const *key, char const *value) {
-  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_count_stub, "apid_set_remove"), "SREM %s %s", key, value);
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_count_stub, "apid_set_remove"), "SREM %s %b", key, value, strlen(value));
 }
 
 static void apid_set_iterate_stub(redisAsyncContext *c, void *r, void *privdata) {
@@ -397,7 +397,7 @@ static void apid_set_contains_stub(redisAsyncContext *c, void *r, void *privdata
 
 int apid_set_contains(apid_bool_callback callback, void *privdata, char const *key, char const *value) {
   assert(callback);
-  return redisAsyncCommand(ctx, apid_set_contains_stub, make_bundle((void *)callback, privdata), "SISMEMBER %s %s", key, value);
+  return redisAsyncCommand(ctx, apid_set_contains_stub, make_bundle((void *)callback, privdata), "SISMEMBER %s %b", key, value, strlen(value));
 }
 
 int apid_hash_clear(apid_number_callback callback, void *privdata, char const *key) {
@@ -405,7 +405,7 @@ int apid_hash_clear(apid_number_callback callback, void *privdata, char const *k
 }
 
 int apid_hash_set(apid_number_callback callback, void *privdata, char const *key, char const *hkey, char const *hvalue) {
-  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_count_stub, "apid_hash_set"), "HSET %s %s %s", key, hkey, hvalue);
+  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_count_stub, "apid_hash_set"), "HSET %s %s %b", key, hkey, hvalue, strlen(hvalue));
 }
 
 static void apid_hash_get_stub(redisAsyncContext *c, void *r, void *privdata) {
