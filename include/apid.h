@@ -26,10 +26,11 @@ int apid_init();
 int apid_init_unix(char const *path);
 int apid_init_tcp(char const *ip, int port);
 #ifdef APID_USE_LIBUV
-int apid_attach(uv_loop_t* loop);
+int apid_attach(uv_loop_t *loop);
 #else
 int apid_start();
 int apid_stop();
+void *apid_loop_handle();
 #endif
 
 char const *apid_underlying_impl();
