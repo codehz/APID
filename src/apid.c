@@ -159,9 +159,9 @@ int apid_stop() {
     return -1;
   return 0;
 }
-#endif
 
 void *apid_loop_handle() { return (void *)loop; }
+#endif
 
 char const *apid_underlying_impl() { return "redis"; }
 void *apid_underlying_context() { return (void *)ctx; }
