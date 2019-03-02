@@ -303,7 +303,7 @@ static void apid_subscibe_stub(redisAsyncContext *c, void *r, void *privdata) {
   if (!reply || reply->type != REDIS_REPLY_ARRAY || strcmp(reply->element[0]->str, "message") != 0) return;
   apid_data_callback callback = (apid_data_callback)priv->callback;
   void *userdata              = priv->privdata;
-  callback(reply->str, userdata);
+  callback(reply->element[2]->str, userdata);
 }
 
 int apid_subscribe(apid_data_callback callback, void *privdata, char const *name) {
