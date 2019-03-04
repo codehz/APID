@@ -19,6 +19,11 @@
 
 #ifndef APID_USE_LIBUV
 static aeEventLoop *loop = NULL;
+#define SHUTDOWN_LOOP                                                                                                                                \
+  aeStop(loop);                                                                                                                                      \
+  return
+#else
+#define SHUTDOWN_LOOP
 #endif
 static redisAsyncContext *sub_ctx = NULL;
 static redisAsyncContext *ctx     = NULL;
@@ -53,18 +58,13 @@ static void rand_str(char *dest, size_t length) {
 static void connectCallback(const redisAsyncContext *c, int status) {
   if (status != REDIS_OK) {
     printf("Error: %s\n", c->errstr);
-#ifndef APID_USE_LIBUV
-    aeStop(loop);
-#endif
-    return;
+    SHUTDOWN_LOOP;
   }
 }
 
 static void disconnectCallback(const redisAsyncContext *c, int status) {
   if (status != REDIS_OK) { printf("Error: %s\n", c->errstr); }
-#ifndef APID_USE_LIBUV
-  aeStop(loop);
-#endif
+  SHUTDOWN_LOOP;
 }
 
 static void apid_count_stub(redisAsyncContext *c, void *r, void *privdata) {
@@ -72,7 +72,7 @@ static void apid_count_stub(redisAsyncContext *c, void *r, void *privdata) {
   redisReply *reply     = (redisReply *)r;
   if (c->err) {
     printf("apid_count_stub: %s\n", c->errstr);
-    exit(1);
+    SHUTDOWN_LOOP;
   }
   if (!reply || reply->type != REDIS_REPLY_INTEGER) return;
   apid_number_callback callback = (apid_number_callback)priv->callback;
@@ -84,7 +84,7 @@ static void apid_count_stub(redisAsyncContext *c, void *r, void *privdata) {
 static void check_error(redisAsyncContext *c, void *r, void *privdata) {
   if (c->err) {
     printf("%s: %s\n", privdata, c->errstr);
-    exit(1);
+    SHUTDOWN_LOOP;
   }
 }
 
@@ -173,7 +173,7 @@ static void action_callback_stub(redisAsyncContext *c, void *r, void *privdata) 
   redisReply *reply             = (redisReply *)r;
   if (c->err) {
     printf("apid_register_action: %s\n", c->errstr);
-    exit(1);
+    SHUTDOWN_LOOP;
   }
   if (!reply || reply->type != REDIS_REPLY_ARRAY || strcmp(reply->element[0]->str, "message") != 0) return;
   callback(reply->element[2]->str, userdata);
@@ -195,7 +195,7 @@ static void method_callback_stub(redisAsyncContext *c, void *r, void *privdata) 
   redisReply *reply             = (redisReply *)r;
   if (c->err) {
     printf("apid_register_method: %s\n", c->errstr);
-    exit(1);
+    SHUTDOWN_LOOP;
   }
   if (!reply || reply->type != REDIS_REPLY_ARRAY || strcmp(reply->element[0]->str, "psubscribe") == 0) return;
   char *full                       = reply->element[2]->str;
@@ -224,7 +224,7 @@ static void apid_zero_stub(redisAsyncContext *c, void *r, void *privdata) {
   redisReply *reply           = (redisReply *)r;
   if (c->err) {
     printf("apid_zero_stub: %s\n", c->errstr);
-    exit(1);
+    SHUTDOWN_LOOP;
   }
   free_bundle(priv);
   callback(userdata);
@@ -239,12 +239,12 @@ static void apid_invoke_method_stub(redisAsyncContext *c, void *r, void *privdat
   redisReply *reply     = (redisReply *)r;
   if (c->err) {
     printf("apid_invoke_method_stub: %s\n", c->errstr);
-    exit(1);
+    SHUTDOWN_LOOP;
   }
   if (!reply) return;
   if (reply->type == REDIS_REPLY_STRING) {
     printf("apid_invoke_method_stub: %s\n", reply->str);
-    exit(1);
+    SHUTDOWN_LOOP;
   }
   if (reply->type != REDIS_REPLY_ARRAY) return;
   apid_data_callback callback = (apid_data_callback)priv->callback;
@@ -275,7 +275,7 @@ static void apid_data_stub(redisAsyncContext *c, void *r, void *privdata) {
   redisReply *reply     = (redisReply *)r;
   if (c->err) {
     printf("apid_data_stub: %s\n", c->errstr);
-    exit(1);
+    SHUTDOWN_LOOP;
   }
   if (!reply) return;
   if (reply->type != REDIS_REPLY_STRING) return;
@@ -298,7 +298,7 @@ static void apid_subscibe_stub(redisAsyncContext *c, void *r, void *privdata) {
   redisReply *reply     = (redisReply *)r;
   if (c->err) {
     printf("apid_subscribe: %s\n", c->errstr);
-    exit(1);
+    SHUTDOWN_LOOP;
   }
   if (!reply || reply->type != REDIS_REPLY_ARRAY || strcmp(reply->element[0]->str, "message") != 0) return;
   apid_data_callback callback = (apid_data_callback)priv->callback;
@@ -316,7 +316,7 @@ static void apid_subscibe_pattern_stub(redisAsyncContext *c, void *r, void *priv
   redisReply *reply     = (redisReply *)r;
   if (c->err) {
     printf("apid_register_method: %s\n", c->errstr);
-    exit(1);
+    SHUTDOWN_LOOP;
   }
   if (!reply || reply->type != REDIS_REPLY_ARRAY || strcmp(reply->element[0]->str, "psubscribe") == 0) return;
   apid_data2_callback callback = (apid_data2_callback)priv->callback;
@@ -346,7 +346,7 @@ static void apid_set_iterate_stub(redisAsyncContext *c, void *r, void *privdata)
   redisReply *reply     = (redisReply *)r;
   if (c->err) {
     printf("apid_set_iterate: %s\n", c->errstr);
-    exit(1);
+    SHUTDOWN_LOOP;
   }
   if (!reply || reply->type != REDIS_REPLY_ARRAY) return;
   apid_data_done_callback callback = (apid_data_done_callback)priv->callback;
@@ -366,7 +366,7 @@ static void apid_set_all_stub(redisAsyncContext *c, void *r, void *privdata) {
   redisReply *reply     = (redisReply *)r;
   if (c->err) {
     printf("apid_set_iterate: %s\n", c->errstr);
-    exit(1);
+    SHUTDOWN_LOOP;
   }
   if (!reply || reply->type != REDIS_REPLY_ARRAY) return;
   apid_data_vector_callback callback = (apid_data_vector_callback)priv->callback;
@@ -388,7 +388,7 @@ static void apid_set_contains_stub(redisAsyncContext *c, void *r, void *privdata
   redisReply *reply     = (redisReply *)r;
   if (c->err) {
     printf("apid_set_contains: %s\n", c->errstr);
-    exit(1);
+    SHUTDOWN_LOOP;
   }
   if (!reply || reply->type != REDIS_REPLY_INTEGER) return;
   apid_bool_callback callback = (apid_bool_callback)priv->callback;
@@ -415,7 +415,7 @@ static void apid_hash_get_stub(redisAsyncContext *c, void *r, void *privdata) {
   redisReply *reply     = (redisReply *)r;
   if (c->err) {
     printf("apid_hash_get: %s\n", c->errstr);
-    exit(1);
+    SHUTDOWN_LOOP;
   }
   if (!reply) return;
   if (reply->type == REDIS_REPLY_NIL) {
