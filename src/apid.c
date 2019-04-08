@@ -13,7 +13,6 @@
 #include <hiredis.h>
 #include <stdlib.h>
 #include <string.h>
-#include <uuid/uuid.h>
 
 #define OPTIONAL_CALLBACK(name, func) (callback ? name : check_error), (callback ? make_bundle((void *)callback, privdata) : (void *)func)
 
