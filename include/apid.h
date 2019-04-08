@@ -43,6 +43,8 @@ int apid_method_reply(apid_method_reply_ctx *, char const *content) __attribute_
 int apid_invoke(apid_zero_callback callback, void *privdata, char const *name, char const *argument);
 int apid_invoke_method(apid_data_callback callback, void *privdata, char const *name, char const *argument);
 
+int apid_invoke_method_timeout(apid_data_callback callback, void *privdata, int timeout, char const *name, char const *argument);
+
 int apid_kv_set(apid_zero_callback callback, void *privdata, char const *name, char const *value);
 int apid_kv_get(apid_data_callback callback, void *privdata, char const *name) __attribute__((nonnull(1)));
 

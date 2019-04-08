@@ -47,7 +47,7 @@ static void rand_str(char *dest, size_t length) {
       "abcdefghijklmnopqrstuvwxyz"
       "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
-  while (length-- > 0) {
+  while (--length > 0) {
     size_t index = (double)rand() / RAND_MAX * (sizeof charset - 1);
     *dest++      = charset[index];
   }
@@ -82,7 +82,7 @@ static void apid_count_stub(redisAsyncContext *c, void *r, void *privdata) {
 
 static void check_error(redisAsyncContext *c, void *r, void *privdata) {
   if (c->err) {
-    printf("%s: %s\n", privdata, c->errstr);
+    printf("%s: %s\n", (char *)privdata, c->errstr);
     SHUTDOWN_LOOP;
   }
 }
@@ -220,7 +220,7 @@ static void apid_zero_stub(redisAsyncContext *c, void *r, void *privdata) {
   callback_bundle *priv       = (callback_bundle *)privdata;
   apid_zero_callback callback = (apid_zero_callback)priv->callback;
   void *userdata              = priv->privdata;
-  redisReply *reply           = (redisReply *)r;
+  (void)r;
   if (c->err) {
     printf("apid_zero_stub: %s\n", c->errstr);
     SHUTDOWN_LOOP;
@@ -245,6 +245,12 @@ static void apid_invoke_method_stub(redisAsyncContext *c, void *r, void *privdat
     printf("apid_invoke_method_stub: %s\n", reply->str);
     SHUTDOWN_LOOP;
   }
+  if (reply->type == REDIS_REPLY_NIL) {
+    apid_data_callback callback = (apid_data_callback)priv->callback;
+    void *userdata              = priv->privdata;
+    free_bundle(priv);
+    callback(NULL, userdata);
+  }
   if (reply->type != REDIS_REPLY_ARRAY) return;
   apid_data_callback callback = (apid_data_callback)priv->callback;
   void *userdata              = priv->privdata;
@@ -262,6 +268,19 @@ int apid_invoke_method(apid_data_callback callback, void *privdata, char const *
   }
   int ret = redisAsyncCommand(ctx, check_error, (void *)"apid_invoke_method", "PUBLISH %s@ignore %b", name, argument, strlen(argument));
   ret |= redisAsyncCommand(ctx, check_error, (void *)"apid_invoke_method", "BRPOP %s@ignore 0", name);
+  return ret;
+}
+
+int apid_invoke_method_timeout(apid_data_callback callback, void *privdata, int timeout, char const *name, char const *argument) {
+  if (callback) {
+    char unq[0x10];
+    rand_str(unq, 0x10);
+    int ret = redisAsyncCommand(ctx, check_error, (void *)"apid_invoke_method", "PUBLISH %s@%s %s", name, unq, argument);
+    ret |= redisAsyncCommand(ctx, apid_invoke_method_stub, make_bundle((void *)callback, privdata), "BRPOP %s@%s %d", name, unq, timeout);
+    return ret;
+  }
+  int ret = redisAsyncCommand(ctx, check_error, (void *)"apid_invoke_method", "PUBLISH %s@ignore %b", name, argument, strlen(argument));
+  ret |= redisAsyncCommand(ctx, check_error, (void *)"apid_invoke_method", "BRPOP %s@ignore %d", name, timeout);
   return ret;
 }
 
@@ -285,7 +304,7 @@ static void apid_data_stub(redisAsyncContext *c, void *r, void *privdata) {
 }
 
 int apid_kv_get(apid_data_callback callback, void *privdata, char const *name) {
-  return redisAsyncCommand(ctx, OPTIONAL_CALLBACK(apid_data_stub, "apid_kv_get"), "GET %s", name);
+  return redisAsyncCommand(ctx, apid_data_stub, make_bundle((void *)callback, privdata), "GET %s", name);
 }
 
 int apid_publish(char const *name, char const *data) {
